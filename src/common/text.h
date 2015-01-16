@@ -57,7 +57,8 @@ void text_emit (int index, session *sess, char *a, char *b, char *c, char *d,
 		time_t timestamp);
 int text_emit_by_name (char *name, session *sess, time_t timestamp,
 					   char *a, char *b, char *c, char *d);
-char *text_validate (char **text, gssize *len);
+gchar *text_fixup_invalid (const gchar* text, gssize len, const gchar *encoding, const gchar *fallback, gsize *len_out);
+gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *to_encoding, const gchar *from_encoding, const gchar *fallback, gsize *len_out);
 int get_stamp_str (char *fmt, time_t tim, char **ret);
 void format_event (session *sess, int index, char **args, char *o, gsize sizeofo, unsigned int stripcolor_args);
 char *text_find_format_string (char *name);

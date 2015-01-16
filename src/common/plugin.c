@@ -970,9 +970,7 @@ hexchat_printf (hexchat_plugin *ph, const char *format, ...)
 void
 hexchat_command (hexchat_plugin *ph, const char *command)
 {
-	char *command_nonconst;
-	char *conv;
-	gssize len = -1;
+	char *command_utf8;
 
 	if (!is_session (ph->context))
 	{
@@ -981,11 +979,9 @@ hexchat_command (hexchat_plugin *ph, const char *command)
 	}
 
 	/* scripts/plugins continue to send non-UTF8... *sigh* */
-	command_nonconst = g_strdup (command);
-	conv = text_validate (&command_nonconst, &len);
-	handle_command (ph->context, command_nonconst, FALSE);
-	g_free (conv);
-	g_free (command_nonconst);
+	command_utf8 = text_fixup_invalid (command, -1, "UTF-8", "\357\277\275", NULL);
+	handle_command (ph->context, command_utf8, FALSE);
+	g_free (command_utf8);
 }
 
 void
