@@ -91,7 +91,7 @@ tcp_send_real (void *ssl, int sok, char *encoding, char *buf, int len)
 	int ret;
 
 	gsize buf_encoded_len;
-	gchar *buf_encoded = text_convert_invalid (buf, len, encoding, "UTF-8", "?", &buf_encoded_len);
+	gchar *buf_encoded = text_invalid_utf8_to_encoding (buf, len, encoding, &buf_encoded_len);
 #ifdef USE_OPENSSL
 	if (!ssl)
 		ret = send (sok, buf_encoded, buf_encoded_len, 0);
@@ -258,7 +258,7 @@ static void
 server_inline (server *serv, char *line, gssize len)
 {
 	gsize len_utf8;
-	line = text_convert_invalid (line, len, "UTF-8", serv->encoding, "\357\277\275", &len_utf8);
+	line = text_invalid_encoding_to_utf8 (line, len, serv->encoding, &len_utf8);
 
 	fe_add_rawlog (serv, line, len_utf8, FALSE);
 

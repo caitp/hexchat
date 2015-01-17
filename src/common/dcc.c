@@ -509,7 +509,7 @@ dcc_chat_line (struct DCC *dcc, char *line)
 	char portbuf[32];
 	message_tags_data no_tags = MESSAGE_TAGS_DATA_INIT;
 
-	line = text_convert_invalid (line, -1, "UTF-8", dcc->serv->encoding, "\357\277\275", NULL);
+	line = text_invalid_encoding_to_utf8 (line, -1, dcc->serv->encoding, NULL);
 
 	sess = find_dialog (dcc->serv, dcc->nick);
 	if (!sess)

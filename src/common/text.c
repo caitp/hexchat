@@ -663,15 +663,7 @@ get_stamp_str (char *fmt, time_t tim, char **ret)
 	gsize len_utf8;
 
 	/* strftime requires the format string to be in locale encoding. */
-	const gchar *charset;
-	if (g_get_charset (&charset))
-	{
-		fmt = text_fixup_invalid (fmt, -1, "UTF-8", "\357\277\275", NULL);
-	}
-	else
-	{
-		fmt = text_convert_invalid (fmt, -1, charset, "UTF-8", "?", NULL);
-	}
+	fmt = g_locale_from_utf8 (fmt, -1, NULL, NULL, NULL);
 
 	len_locale = strftime_validated (dest, sizeof (dest), fmt, localtime (&tim));
 
@@ -757,7 +749,7 @@ log_write (session *sess, char *text, time_t ts)
 	g_free (temp);
 }
 
-gchar *text_fixup_invalid (const gchar* text, gssize len, const gchar *encoding, const gchar *fallback, gsize *len_out)
+static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *to_encoding, const gchar *from_encoding, const gchar *fallback, gsize *len_out)
 {
 	gchar *result_part;
 	gsize result_part_len;
@@ -773,7 +765,7 @@ gchar *text_fixup_invalid (const gchar* text, gssize len, const gchar *encoding,
 
 	end = text + len;
 
-	result_part = g_convert (text, len, encoding, encoding, &invalid_start_pos, &result_part_len, NULL);
+	result_part = g_convert (text, len, to_encoding, from_encoding, &invalid_start_pos, &result_part_len, NULL);
 	if (result_part != NULL)
 	{
 		if (len_out != NULL)
@@ -789,7 +781,7 @@ gchar *text_fixup_invalid (const gchar* text, gssize len, const gchar *encoding,
 
 	do
 	{
-		result_part = g_convert (current_start, invalid_start_pos, encoding, encoding, &invalid_start_pos, &result_part_len, NULL);
+		result_part = g_convert (current_start, invalid_start_pos, to_encoding, from_encoding, &invalid_start_pos, &result_part_len, NULL);
 		g_assert (result_part != NULL);
 		g_string_append_len (result, result_part, result_part_len);
 		g_free (result_part);
@@ -798,7 +790,7 @@ gchar *text_fixup_invalid (const gchar* text, gssize len, const gchar *encoding,
 
 		current_start += invalid_start_pos + 1;
 
-		result_part = g_convert (current_start, end - current_start, encoding, encoding, &invalid_start_pos, &result_part_len, NULL);
+		result_part = g_convert (current_start, end - current_start, to_encoding, from_encoding, &invalid_start_pos, &result_part_len, NULL);
 		if (result_part != NULL)
 		{
 			g_string_append_len (result, result_part, result_part_len);
@@ -819,66 +811,14 @@ gchar *text_fixup_invalid (const gchar* text, gssize len, const gchar *encoding,
 	return NULL;
 }
 
-gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *to_encoding, const gchar *from_encoding, const gchar *fallback, gsize *len_out)
+gchar *text_invalid_utf8_to_encoding (const gchar* text, gssize len, const gchar *to_encoding, gsize *len_out)
 {
-	gchar *result_part;
-	gsize result_part_len;
-	const gchar *end;
-	gsize invalid_start_pos;
-	GString *result;
-	const gchar *current_start;
+	return text_convert_invalid (text, len, to_encoding, "UTF-8", "?", len_out);
+}
 
-	if (len == -1)
-	{
-		len = strlen (text);
-	}
-
-	end = text + len;
-
-	result_part = g_convert_with_fallback (text, len, to_encoding, from_encoding, fallback, &invalid_start_pos, &result_part_len, NULL);
-	if (result_part != NULL)
-	{
-		if (len_out != NULL)
-		{
-			*len_out = result_part_len;
-		}
-
-		return result_part;
-	}
-
-	result = g_string_sized_new (len);
-	current_start = text;
-
-	do
-	{
-		result_part = g_convert_with_fallback (current_start, invalid_start_pos, to_encoding, from_encoding, fallback, &invalid_start_pos, &result_part_len, NULL);
-		g_assert (result_part != NULL);
-		g_string_append_len (result, result_part, result_part_len);
-		g_free (result_part);
-
-		g_string_append (result, fallback);
-
-		current_start += invalid_start_pos + 1;
-
-		result_part = g_convert_with_fallback (current_start, end - current_start, to_encoding, from_encoding, fallback, &invalid_start_pos, &result_part_len, NULL);
-		if (result_part != NULL)
-		{
-			g_string_append_len (result, result_part, result_part_len);
-			g_free (result_part);
-
-			if (len_out != NULL)
-			{
-				*len_out = result->len;
-			}
-
-			return g_string_free (result, FALSE);
-		}
-	}
-	while (current_start + invalid_start_pos < end);
-
-	g_assert_not_reached ();
-
-	return NULL;
+gchar *text_invalid_encoding_to_utf8 (const gchar* text, gssize len, const gchar *from_encoding, gsize *len_out)
+{
+	return text_convert_invalid (text, len, "UTF-8", from_encoding, "\357\277\275", len_out);
 }
 
 void
@@ -898,7 +838,7 @@ PrintTextTimeStamp (session *sess, char *text, time_t timestamp)
 	}
 	else
 	{
-		text = text_fixup_invalid (text, -1, "UTF-8", "\357\277\275", NULL);
+		text = text_invalid_encoding_to_utf8 (text, -1, "UTF-8", NULL);
 	}
 
 	log_write (sess, text, timestamp);
