@@ -749,6 +749,12 @@ log_write (session *sess, char *text, time_t ts)
 	g_free (temp);
 }
 
+/**
+ * Converts a given string in from_encoding to to_encoding. This is similar to g_convert_with_fallback, except that it is tolerant of sequences in the original input that are invalid
+ * even in from_encoding. g_convert_with_fallback fails for such text, whereas this function replaces such a sequence with the fallback string.
+ *
+ * If len is -1, strlen(text) is used to calculate the length. Do not pass -1 if text is supposed to contain \0 bytes, such as if from_encoding is a multi-byte encoding like UTF-16.
+ */
 static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *to_encoding, const gchar *from_encoding, const gchar *fallback, gsize *len_out)
 {
 	gchar *result_part;
@@ -765,9 +771,12 @@ static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *
 
 	end = text + len;
 
+	/* Find the first position of an invalid sequence. */
 	result_part = g_convert (text, len, to_encoding, from_encoding, &invalid_start_pos, &result_part_len, NULL);
 	if (result_part != NULL)
 	{
+		/* All text converted successfully on the first try. Return it. */
+
 		if (len_out != NULL)
 		{
 			*len_out = result_part_len;
@@ -776,23 +785,30 @@ static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *
 		return result_part;
 	}
 
+	/* One or more invalid sequences exist that need to be replaced with the fallback. */
+
 	result = g_string_sized_new (len);
 	current_start = text;
 
 	do
 	{
+		/* Convert everything before the position of the invalid sequence. It should be successful. */
 		result_part = g_convert (current_start, invalid_start_pos, to_encoding, from_encoding, &invalid_start_pos, &result_part_len, NULL);
 		g_assert (result_part != NULL);
 		g_string_append_len (result, result_part, result_part_len);
 		g_free (result_part);
 
+		/* Append the fallback */
 		g_string_append (result, fallback);
 
+		/* Now try converting everything after the invalid sequence. */
 		current_start += invalid_start_pos + 1;
 
 		result_part = g_convert (current_start, end - current_start, to_encoding, from_encoding, &invalid_start_pos, &result_part_len, NULL);
 		if (result_part != NULL)
 		{
+			/* The rest of the text converted successfully. Append it and return the whole converted text. */
+
 			g_string_append_len (result, result_part, result_part_len);
 			g_free (result_part);
 
@@ -803,8 +819,12 @@ static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *
 
 			return g_string_free (result, FALSE);
 		}
+
+		/* The rest of the text didn't convert successfully. invalid_start_pos has the position of the next invalid sequence. */
 	}
 	while (current_start + invalid_start_pos < end);
+
+	/* Can never reach here. When the whole string has been converted, current_start_pos + invalid_start_pos must be equal to end. */
 
 	g_assert_not_reached ();
 
