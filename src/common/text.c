@@ -824,7 +824,9 @@ static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *
 	}
 	while (current_start + invalid_start_pos < end);
 
-	/* Can never reach here. When the whole string has been converted, current_start_pos + invalid_start_pos must be equal to end. */
+	/* Can never reach here. current_start_pos + invalid_start_pos should always be less than end. It will be equal to end if the whole string has been converted successfully,
+	 * but then it should already have been returned from inside the loop.
+	 */
 
 	g_assert_not_reached ();
 
