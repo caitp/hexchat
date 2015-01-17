@@ -790,8 +790,10 @@ static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *
 	result = g_string_sized_new (len);
 	current_start = text;
 
-	do
+	for (;;)
 	{
+		g_assert (current_start + invalid_start_pos < end);
+
 		/* Convert everything before the position of the invalid sequence. It should be successful. */
 		result_part = g_convert (current_start, invalid_start_pos, to_encoding, from_encoding, &invalid_start_pos, &result_part_len, NULL);
 		g_assert (result_part != NULL);
@@ -822,15 +824,6 @@ static gchar *text_convert_invalid (const gchar* text, gssize len, const gchar *
 
 		/* The rest of the text didn't convert successfully. invalid_start_pos has the position of the next invalid sequence. */
 	}
-	while (current_start + invalid_start_pos < end);
-
-	/* Can never reach here. current_start_pos + invalid_start_pos should always be less than end. It will be equal to end if the whole string has been converted successfully,
-	 * but then it should already have been returned from inside the loop.
-	 */
-
-	g_assert_not_reached ();
-
-	return NULL;
 }
 
 gchar *text_invalid_utf8_to_encoding (const gchar* text, gssize len, const gchar *to_encoding, gsize *len_out)
